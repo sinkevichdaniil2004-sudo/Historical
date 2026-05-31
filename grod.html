@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Интерактивная карта | Гродненская область - 152 историко-культурных ценностей</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #eef2e6;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a4d2a, #0f331b);
+            color: white;
+            padding: 8px 16px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+        .header p {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+        .filter-panel {
+            background: white;
+            padding: 8px 16px;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+            position: relative;
+            z-index: 900;
+        }
+        .filter-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        .filter-btn {
+            background: #f0f2f5;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            font-size: 0.8rem;
+        }
+        .filter-btn:hover {
+            transform: translateY(-2px);
+        }
+        .filter-btn.active {
+            background: #1a4d2a;
+            color: white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        .filter-btn[data-cat="0"] { border-left: 4px solid #b91c1c; }
+        .filter-btn[data-cat="1"] { border-left: 4px solid #f97316; }
+        .filter-btn[data-cat="2"] { border-left: 4px solid #1e88e5; }
+        .filter-btn[data-cat="3"] { border-left: 4px solid #2b7a3e; }
+        .stats {
+            display: inline-block;
+            background: #e9ecef;
+            border-radius: 30px;
+            padding: 2px 10px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        #map {
+            height: calc(100vh - 160px);
+            width: 100%;
+            background: #cbdcc7;
+        }
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
+            line-height: 1.4;
+            font-weight: 500;
+            backdrop-filter: blur(4px);
+            border-left: 4px solid #1a4d2a;
+            pointer-events: none;
+        }
+        .legend span {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+        .info-panel {
+            position: absolute;
+            bottom: 0px;
+            right: 0px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 24px;
+            font-size: 10px;
+            font-family: monospace;
+            z-index: 1000;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+        }
+        @media (max-width: 700px) {
+            .header h1 { font-size: 1rem; }
+            .filter-btn { padding: 4px 10px; font-size: 0.7rem; }
+            .legend, .info-panel { font-size: 8px; }
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>🏛️ Историко-культурные ценности Гродненской области</h1>
+    <p>152 объектов | Госсписок РБ | Категории 0,1,2,3</p>
+</div>
+<div class="filter-panel">
+    <div style="font-weight:600; margin-bottom:4px; font-size:0.9rem;">📌 Фильтр по категории</div>
+    <div class="filter-buttons">
+        <button class="filter-btn active" data-cat="all">🏺 Все объекты (152)</button>
+        <button class="filter-btn" data-cat="0">🔴 Категория 0</button>
+        <button class="filter-btn" data-cat="1">🟠 Категория 1</button>
+        <button class="filter-btn" data-cat="2">🔵 Категория 2</button>
+        <button class="filter-btn" data-cat="3">🟢 Категория 3</button>
+    </div>
+    <div style="margin-top: 6px; font-size:0.75rem;"><span class="stats" id="stats">Всего: 152</span></div>
+</div>
+<div id="map"></div>
+<div class="legend">
+    <strong>Категория охраны</strong><br>
+    <span style="background:#b91c1c;"></span> 0 — национальное<br>
+    <span style="background:#f97316;"></span> 1 — международное<br>
+    <span style="background:#1e88e5;"></span> 2 — республиканское<br>
+    <span style="background:#2b7a3e;"></span> 3 — местное
+</div>
+<div class="info-panel">
+    📍 Leaflet + OSM | Слои: ☰ в правом углу
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // ------------------- 1. КАРТА -------------------
+    const map = L.map('map').setView([53.67, 23.85], 9);
+
+    // ------------------- 2. ПОДЛОЖКИ -------------------
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap',
+        maxZoom: 19
+    });
+    const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OSM & CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19
+    });
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri',
+        maxZoom: 18
+    });
+    const grayLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OSM & CARTO (no labels)',
+        subdomains: 'abcd',
+        maxZoom: 19
+    });
+    const hotLayer = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+        attribution: '&copy; OSM Humanitarian',
+        maxZoom: 19
+    });
+
+    const baseMaps = {
+        "🗺️ OpenStreetMap": osmLayer,
+        "🌿 CartoDB Light": cartoLight,
+        "🛰️ Спутник (Esri)": satelliteLayer,
+        "⚪ Серый (без надписей)": grayLayer,
+        "🔥 Humanitarian OSM": hotLayer
+    };
+    osmLayer.addTo(map);
+    L.control.layers(baseMaps).addTo(map);
+
+    // ------------------- 3. МАССИВ ОБЪЕКТОВ (152 уникальных меток) -------------------
+    const grodnoSights = [
+        // ----- Гродно и окрестности (12) -----
+        { name: "Коложская церковь (Борисоглебская)", lat: 53.6784, lng: 23.8341, date: "XII в.", category: "0", description: "Уникальный памятник древнерусского зодчества, фрески XII века, включена в предварительный список ЮНЕСКО." },
+        { name: "Старый замок (Гродно)", lat: 53.6775, lng: 23.8269, date: "XI–XIX вв.", category: "0", description: "Королевская резиденция, музей. Место проведения рыцарских фестивалей." },
+        { name: "Новый замок (Гродно)", lat: 53.6771, lng: 23.8282, date: "1737–1742", category: "0", description: "Дворец Августа III, место проведения сеймов Речи Посполитой." },
+        { name: "Фарный костёл (Костёл Франциска Ксаверия)", lat: 53.6790, lng: 23.8324, date: "XVII–XVIII вв.", category: "1", description: "Великолепный барочный интерьер, высочайший алтарь Европы (21 м)." },
+        { name: "Августовский канал (участок Гродненский)", lat: 53.8486, lng: 23.6367, date: "1824–1839", category: "1", description: "Памятник гидротехники XIX века, шлюзы, туристический маршрут." },
+        { name: "Лютеранская кирха (Гродно)", lat: 53.6742, lng: 23.8319, date: "1793–1797", category: "3", description: "Неоготическая кирха, сейчас концертный зал." },
+        { name: "Синагога Большая хоральная (Гродно)", lat: 53.6788, lng: 23.8298, date: "1902–1905", category: "3", description: "Одна из самых красивых синагог в стиле мавританского ренессанса." },
+        { name: "Бригитский монастырь (Гродно)", lat: 53.6759, lng: 23.8332, date: "1633–1642", category: "2", description: "Ансамбль монастыря и костёла, фрески, ныне музей." },
+        { name: "Костёл Благовещения и монастырь бернардинцев", lat: 53.6778, lng: 23.8260, date: "XVIII в.", category: "2", description: "Архитектурный комплекс в стиле виленского барокко." },
+        { name: "Покровский кафедральный собор (Гродно)", lat: 53.6806, lng: 23.8293, date: "1904–1907", category: "2", description: "Неорусский стиль, главный православный храм города." },
+        { name: "Костёл Пресвятой Девы Марии Ангельской (Гродно)", lat: 53.6773, lng: 23.8249, date: "1845", category: "3", description: "Неоготика." },
+        { name: "Замковая церковь (Гродно)", lat: 53.6779, lng: 23.8278, date: "XVI в.", category: "2", description: "Церковь при старом замке." },
+        // ----- Лидский район (8) -----
+        { name: "Лидский замок", lat: 53.8874, lng: 25.2997, date: "XIV в.", category: "0", description: "Замок Гедимина, отреставрирован, место проведения рыцарских фестивалей." },
+        { name: "Костёл Воздвижения Святого Креста (Лида)", lat: 53.8861, lng: 25.2990, date: "1770", category: "2", description: "Памятник архитектуры в стиле позднего барокко." },
+        { name: "Церковь Пресвятой Богородицы (Голдово)", lat: 53.8558, lng: 25.2236, date: "XV в.", category: "2", description: "Церковь-крепость в стибе готики." },
+        { name: "Усадьба Бохвицев (Подороск)", lat: 53.3244, lng: 24.6608, date: "XIX в.", category: "3", description: "Памятник усадебно-паркового искусства." },
+        { name: "Костёл Святого Георгия (Лида)", lat: 53.8821, lng: 25.2967, date: "XVIII в.", category: "3", description: "Деревянный костёл, образец народного зодчества." },
+        { name: "Церковь Святого Михаила (Тарново)", lat: 53.7942, lng: 25.3542, date: "XIX в.", category: "3", description: "Деревянная церковь." },
+        { name: "Городище 'Лида' (летописный город)", lat: 53.8844, lng: 25.2958, date: "XI–XIII вв.", category: "2", description: "Археологический памятник, место древнего поселения." },
+        { name: "Усадьба Граевских (Ваверка)", lat: 53.8614, lng: 25.1781, date: "XIX в.", category: "3", description: "Парк и флигели." },
+        // ----- Новогрудский район (10) -----
+        { name: "Новогрудский замок (руины)", lat: 53.6001, lng: 25.8238, date: "XIII–XVII вв.", category: "0", description: "Место коронации Миндовга, одна из резиденций ВКЛ." },
+        { name: "Фарный костёл (Новогрудок)", lat: 53.5968, lng: 25.8224, date: "1395/XVIII в.", category: "1", description: "Костёл Преображения, связан с Адамом Мицкевичем." },
+        { name: "Борисоглебская церковь (Новогрудок)", lat: 53.5978, lng: 25.8279, date: "XVI–XVII вв.", category: "2", description: "Православный храм, древние фрески." },
+        { name: "Усадьба Мицкевичей (Новогрудок)", lat: 53.5964, lng: 25.8228, date: "XIX в.", category: "1", description: "Дом-музей Адама Мицкевича." },
+        { name: "Николаевская церковь (Новогрудок)", lat: 53.5958, lng: 25.8256, date: "1780", category: "2", description: "Православный храм в стиле классицизма." },
+        { name: "Костёл Св. Михаила (Вселюб)", lat: 53.7264, lng: 25.8567, date: "1433", category: "2", description: "Один из старейших костёлов Беларуси." },
+        { name: "Церковь Св. Николая (Валевка)", lat: 53.6083, lng: 25.8531, date: "XIX в.", category: "3", description: "Деревянная церковь." },
+        { name: "Гора Миндовга (курган)", lat: 53.5986, lng: 25.8197, date: "XIII в.", category: "2", description: "Легендарное место, связанное с основателем ВКЛ." },
+        { name: "Костёл Св. Иоанна (Щорсы)", lat: 53.6078, lng: 25.6047, date: "XVII в.", category: "2", description: "Памятник архитектуры барокко." },
+        { name: "Парк Радзивиллов (Новогрудок)", lat: 53.5939, lng: 25.8217, date: "XVIII–XIX вв.", category: "3", description: "Пейзажный парк." },
+        // ----- Слонимский район (10) -----
+        { name: "Слонимская синагога (Большая)", lat: 53.0933, lng: 25.3144, date: "1642", category: "2", description: "Барочная синагога с уникальной росписью." },
+        { name: "Дворец Огинских (Слоним)", lat: 53.0906, lng: 25.3109, date: "XVIII в.", category: "2", description: "Руины дворца, парк, остатки оранжерей." },
+        { name: "Костёл Св. Андрея (Слоним)", lat: 53.0921, lng: 25.3188, date: "1775", category: "2", description: "Позднее барокко, действующий костёл." },
+        { name: "Усадьба Альбертин (Слоним)", lat: 53.0886, lng: 25.3214, date: "XIX в.", category: "2", description: "Памятник усадебной архитектуры, ранее здесь располагалась суконная мануфактура." },
+        { name: "Костёл Непорочного Зачатия (Жировичи)", lat: 53.0089, lng: 25.3408, date: "1769", category: "2", description: "Памятник архитектуры позднего барокко в комплексе Жировичского монастыря." },
+        { name: "Усадьба Русецких (Слоним)", lat: 53.0831, lng: 25.3086, date: "XIX в.", category: "3", description: "Парк." },
+        { name: "Троицкий костёл (Деревная)", lat: 53.1094, lng: 25.3375, date: "1770", category: "3", description: "Деревянный костёл." },
+        { name: "Церковь Рождества Богородицы (Слоним)", lat: 53.0914, lng: 25.3125, date: "XIX в.", category: "3", description: "Православная церковь." },
+        { name: "Городище 'Слоним'", lat: 53.0881, lng: 25.3169, date: "XI–XIII вв.", category: "2", description: "Древнее поселение." },
+        { name: "Парк Огинских (Слоним)", lat: 53.0894, lng: 25.3122, date: "XVIII–XIX вв.", category: "3", description: "Пейзажный парк." },
+        // ----- Волковысский район (8) -----
+        { name: "Волковысская церковь-крепость (Св. Николая)", lat: 53.1571, lng: 24.4680, date: "XIII–XIV вв.", category: "2", description: "Оборонный храм, перестроен, древнее городище." },
+        { name: "Музей 'Багратион' (Волковыск)", lat: 53.1565, lng: 24.4708, date: "1812/XX в.", category: "3", description: "Штаб-квартира князя Багратиона, историческая экспозиция." },
+        { name: "Костёл Св. Вацлава (Волковыск)", lat: 53.1578, lng: 24.4712, date: "1848", category: "3", description: "Неороманский костёл." },
+        { name: "Городище 'Шведская гора'", lat: 53.1667, lng: 24.4650, date: "X–XIII вв.", category: "2", description: "Археологический памятник." },
+        { name: "Церковь Александра Невского (Волковыск)", lat: 53.1589, lng: 24.4667, date: "1869", category: "3", description: "Ретроспективный русский стиль." },
+        { name: "Усадьба Тизенгауза (Россь)", lat: 53.0333, lng: 24.4000, date: "XIX в.", category: "3", description: "Парк и руины." },
+        { name: "Костёл Св. Иоанна (Изабелин)", lat: 53.0833, lng: 24.5500, date: "1908", category: "3", description: "Неоготика." },
+        { name: "Окопы времени войны 1812", lat: 53.1500, lng: 24.4583, date: "1812", category: "3", description: "Полевые укрепления." },
+        // ----- Щучинский район (7) -----
+        { name: "Усадьба Друцких-Любецких (Щучин)", lat: 53.6031, lng: 24.7463, date: "XVIII–XIX вв.", category: "2", description: "Дворцово-парковый комплекс, ныне музей." },
+        { name: "Костёл Св. Терезы (Щучин)", lat: 53.6014, lng: 24.7486, date: "1845–1850", category: "3", description: "Неоготика, действующий." },
+        { name: "Усадьба Ходкевичей (Б. Можейково)", lat: 53.7839, lng: 24.5725, date: "1787", category: "3", description: "Памятник усадебной архитектуры." },
+        { name: "Костёл Св. Иоанна (Острино)", lat: 53.7333, lng: 24.5333, date: "1862", category: "3", description: "Деревянный костёл." },
+        { name: "Церковь Св. Михаила (Желудок)", lat: 53.6039, lng: 24.7361, date: "XIX в.", category: "3", description: "Православная церковь." },
+        { name: "Городище 'Щучин'", lat: 53.6000, lng: 24.7444, date: "XI–XIII вв.", category: "2", description: "Летописный город." },
+        { name: "Парк Друцких-Любецких", lat: 53.6025, lng: 24.7450, date: "XIX в.", category: "3", description: "Пейзажный парк." },
+        // ----- Сморгонский район (7) -----
+        { name: "Сморгонский иезуитский коллегиум", lat: 54.4796, lng: 26.3957, date: "1606–1620", category: "2", description: "Здание бывшего коллегиума, фармацевтический музей." },
+        { name: "Троицкий костёл (Жодишки)", lat: 54.7689, lng: 26.3911, date: "1600–1612", category: "2", description: "Памятник архитектуры." },
+        { name: "Костёл Св. Михаила (Сморгонь)", lat: 54.4806, lng: 26.3961, date: "1906", category: "3", description: "Памятник архитектуры в стиле барокко." },
+        { name: "Часовня Козелл-Поклевских", lat: 54.4778, lng: 26.4008, date: "XIX в.", category: "3", description: "Неоготическая часовня." },
+        { name: "Церковь Св. Анны (Крево)", lat: 54.3121, lng: 26.2831, date: "XVI в.", category: "2", description: "Руины, часть замка." },
+        { name: "Городище 'Сморгонь'", lat: 54.4789, lng: 26.3989, date: "X–XIII вв.", category: "2", description: "Археологический памятник." },
+        // ----- Мостовский район (5) -----
+        { name: "Церковь Св. Михаила (Голубичи)", lat: 53.4272, lng: 24.6440, date: "1514", category: "2", description: "Церковь-крепость, готика." },
+        { name: "Усадьба Ельских (Дубно)", lat: 53.4289, lng: 24.6483, date: "XIX в.", category: "3", description: "Парк и руины усадьбы." },
+        { name: "Костёл Св. Иоанна (Мосты)", lat: 53.4044, lng: 24.5375, date: "1907", category: "3", description: "Неоготика." },
+        { name: "Церковь Рождества Богородицы (Пески)", lat: 53.4322, lng: 24.6333, date: "1864", category: "3", description: "Православная церковь." },
+        { name: "Городище 'Мосты'", lat: 53.4028, lng: 24.5358, date: "XI–XIII вв.", category: "2", description: "Древнее городище." },
+        // ----- Островецкий район (6) -----
+        { name: "Костёл Троицкий (Островец)", lat: 54.6140, lng: 25.9546, date: "1787", category: "2", description: "Позднее барокко." },
+        { name: "Костёл Св. Петра и Павла (Островец)", lat: 54.6144, lng: 25.9547, date: "1787", category: "2", description: "Памятник архитектуры позднего барокко." },
+        { name: "Костёл Св. Анны (Михалишки)", lat: 54.8353, lng: 25.9361, date: "1783", category: "3", description: "Деревянный костёл." },
+        { name: "Усадьба Огинских (Ворняны)", lat: 54.42026173020698, lng: 26.52317066879075, date: "XVIII в.", category: "2", description: "Дворцово-парковый комплекс." },
+        // ----- Кореличский район (7) -----
+        { name: "Кореличский замок (руины)", lat: 53.5632, lng: 26.1441, date: "XVI в.", category: "2", description: "Руины ренессансного замка Радзивиллов." },
+        { name: "Замковый комплекс «Мир»", lat: 53.4511, lng: 26.4728, date: "XVI в.", category: "0", description: "Объект Всемирного наследия ЮНЕСКО." },
+        { name: "Покровская церковь (Турец)", lat: 53.5206, lng: 26.3189, date: "1874", category: "3", description: "Православный храм." },
+        { name: "Церковь-усыпальница Святополк-Мирских", lat: 53.4558, lng: 26.4664, date: "1910", category: "3", description: "Неоготическая часовня-усыпальница." },
+        { name: "Спасо-Преображенская церковь (Кореличи)", lat: 53.5614, lng: 26.1406, date: "1866", category: "3", description: "Кирпичный храм." },
+        { name: "Усадьба Булгариных (Кореличи)", lat: 53.5642, lng: 26.1439, date: "XIX в.", category: "3", description: "Парк." },
+        { name: "Городище 'Кореличи'", lat: 53.5625, lng: 26.1422, date: "XI–XIII вв.", category: "2", description: "Древнее поселение." },
+        // ----- Дятловский район (6) -----
+        { name: "Костёл Успения (Дятлово)", lat: 53.4627, lng: 25.4082, date: "1624–1646", category: "2", description: "Памятник сарматского барокко." },
+        { name: "Усадьба Хрептовичей (Щорсы)", lat: 53.6061, lng: 25.6050, date: "XVIII–XIX вв.", category: "2", description: "Памятник усадебной архитектуры." },
+        { name: "Церковь Рождества Богородицы (Дворец)", lat: 53.4128, lng: 25.4169, date: "XIX в.", category: "3", description: "Деревянная церковь." },
+        { name: "Костёл Св. Антония (Новоельня)", lat: 53.5417, lng: 25.6750, date: "1908", category: "3", description: "Неоготика." },
+        { name: "Парк Хрептовичей (Щорсы)", lat: 53.6072, lng: 25.6044, date: "XIX в.", category: "3", description: "Пейзажный парк." },
+        { name: "Городище 'Дятлово'", lat: 53.4619, lng: 25.4069, date: "XI–XIII вв.", category: "2", description: "Археологический памятник." },
+        // ----- Зельвенский район (5) -----
+        { name: "Костёл Св. Иоанна (Деречин)", lat: 53.1175, lng: 24.7456, date: "1770", category: "2", description: "Позднее барокко." },
+        { name: "Свято-Покровская церковь (Зельва)", lat: 53.1494, lng: 24.8089, date: "1913", category: "3", description: "Православный храм." },
+        { name: "Церковь Рождества Богородицы (Сынковичи)", lat: 53.1281, lng: 25.1556, date: "XV–XVI вв.", category: "2", description: "Церковь-крепость." },
+        { name: "Усадьба Роммеров (Зельва)", lat: 53.1500, lng: 24.8125, date: "XIX в.", category: "3", description: "Парк и флигели." },
+        { name: "Городище 'Зельва'", lat: 53.1472, lng: 24.8067, date: "XI–XIII вв.", category: "2", description: "Древнерусское городище." },
+        // ----- Ивьевский район (6) -----
+        { name: "Костёл Петра и Павла (Ивье)", lat: 53.9306, lng: 25.7686, date: "1495-1633", category: "2", description: "Памятник готики и ренессанса." },
+        { name: "Усадьба Умястовских (Жемыславль)", lat: 53.8106, lng: 25.9211, date: "XIX в.", category: "3", description: "Дворцово-парковый комплекс." },
+        { name: "Костёл Св. Вацлава (Геранёны)", lat: 54.1197, lng: 25.4567, date: "1529", category: "2", description: "Один из старейших костёлов Беларуси." },
+        { name: "Усадьба Забелло (Трабы)", lat: 53.9903, lng: 25.9847, date: "XIX в.", category: "3", description: "Парк." },
+        { name: "Церковь Св. Михаила (Геранёны)", lat: 54.1211, lng: 25.4583, date: "XIX в.", category: "3", description: "Православная церковь." },
+        { name: "Городище 'Ивье'", lat: 53.9319, lng: 25.7706, date: "XI–XIII вв.", category: "2", description: "Археологический памятник." },
+        // ----- Берестовицкий район (5) -----
+        { name: "Костёл Воздвижения Креста (Макаровцы)", lat: 53.3883, lng: 24.1139, date: "конец XVIII в.", category: "3", description: "Памятник деревянного народного зодчества." },
+        { name: "Церковь Св. Михаила (Берестовица)", lat: 53.3244, lng: 24.5333, date: "XIX в.", category: "3", description: "Православная церковь." },
+        { name: "Усадьба Горваттов (Берестовица)", lat: 53.3239, lng: 24.5317, date: "XIX в.", category: "3", description: "Парк." },
+        { name: "Костёл Св. Анны (Малая Берестовица)", lat: 53.3917, lng: 24.1167, date: "1863", category: "3", description: "Неоготика." },
+        { name: "Городище 'Берестовица'", lat: 53.3222, lng: 24.5328, date: "XI–XIII вв.", category: "2", description: "Древнее поселение." },
+        // ----- Вороновский район (6) -----
+        { name: "Усадьба Путткамеров (Ботельники)", lat: 54.0439, lng: 25.1525, date: "XIX в.", category: "3", description: "Усадебный дом, связанный с Адамом Мицкевичем." },
+        { name: "Костёл Непорочного Зачатия (Радунь)", lat: 54.0517, lng: 24.9956, date: "1904", category: "3", description: "Неоготический костёл." },
+        { name: "Церковь Св. Михаила (Вороново)", lat: 54.1500, lng: 25.3153, date: "1885", category: "3", description: "Православная церковь." },
+        { name: "Усадьба Абрамовичей (Вороново)", lat: 54.1483, lng: 25.3139, date: "XIX в.", category: "3", description: "Парк." },
+        { name: "Городище 'Вороново'", lat: 54.1472, lng: 25.3144, date: "XI–XIII вв.", category: "2", description: "Археологический памятник." },
+        // ----- Ошмянский район (5) -----
+        { name: "Францисканский костёл (Ошмяны)", lat: 54.4242, lng: 25.9347, date: "1825", category: "2", description: "Памятник архитектуры классицизма." },
+        { name: "Церковь Воскресения (Ошмяны)", lat: 54.4217, lng: 25.9361, date: "1875", category: "3", description: "Православный храм." },
+        { name: "Костёл Св. Михаила (Гольшаны)", lat: 54.2567, lng: 26.0147, date: "1618", category: "2", description: "Памятник оборонного зодчества." },
+        { name: "Усадьба Важинских (Ошмяны)", lat: 54.4228, lng: 25.9381, date: "XIX в.", category: "3", description: "Парк." },
+        { name: "Городище 'Ошмяны'", lat: 54.4247, lng: 25.9356, date: "XI–XIII вв.", category: "2", description: "Древнее поселение." },
+        // ----- Свислочский район (5) -----
+        { name: "Усадебный дом Красинских (Свислочь)", lat: 53.0333, lng: 24.0956, date: "1911-1912", category: "2", description: "Памятник архитектуры неоклассицизма." },
+        { name: "Церковь Св. Анны (Задворяне)", lat: 53.0669, lng: 24.1139, date: "XIX в.", category: "3", description: "Православный храм." },
+        { name: "Костёл Св. Франциска (Порозово)", lat: 52.9431, lng: 24.3797, date: "1857", category: "3", description: "Неоготика." },
+        { name: "Усадьба Воловичей (Свислочь)", lat: 53.0322, lng: 24.0972, date: "XIX в.", category: "3", description: "Флигели." },
+        { name: "Городище 'Свислочь'", lat: 53.0317, lng: 24.0944, date: "XI–XIII вв.", category: "2", description: "Археологический памятник." },
+        // ----- Гродненский район (дополнительные) -----
+        { name: "Костёл Св. Казимира (Адельск)", lat: 53.4017, lng: 23.7972, date: "конец XVIII в.", category: "3", description: "Памятник архитектуры в стиле позднего барокко." },
+        { name: "Церковь Александра Невского (Вертелишки)", lat: 53.7369, lng: 23.7567, date: "1901", category: "3", description: "Православный храм, построенный в память о спасении царской семьи." },
+        { name: "Церковь Рождества Богородицы (Мурованка)", lat: 53.7158, lng: 24.9842, date: "1524–1542", category: "2", description: "Церковь-крепость, готика с ренессансом." },
+        { name: "Сынковичская церковь-крепость", lat: 53.1281, lng: 25.1556, date: "XV–XVI вв.", category: "2", description: "Мощная оборонная церковь, входит в туристический маршрут." },
+        { name: "Дворец Воловичей (Свяцк)", lat: 53.6341, lng: 24.1180, date: "1779", category: "2", description: "Дворцово-парковый ансамбль, усадьба Воловичей." },
+        { name: "Успенская церковь (Жировичи)", lat: 53.0121, lng: 25.3389, date: "1650", category: "1", description: "Главный храм Жировичского монастыря, чудотворная икона." },
+        { name: "Свято-Успенский монастырь (Жировичи)", lat: 53.0125, lng: 25.3365, date: "XVI–XIX вв.", category: "1", description: "Крупнейший православный монастырь Беларуси." },
+        { name: "Церковь Св. Михаила (Гнезно)", lat: 53.9045, lng: 25.2505, date: "1524", category: "2", description: "Церковь-крепость в стиле готики." },
+        // ----- НОВЫЕ ОБЪЕКТЫ (+30) -----
+        { name: "Городницкий археологический комплекс", lat: 53.6667, lng: 23.7667, date: "XI–XIII вв.", category: "2", description: "Остатки древнерусского города, городище и селище." },
+        { name: "Усадьба Немцевичей (Скоки)", lat: 53.6833, lng: 23.7167, date: "XIX в.", category: "3", description: "Усадебный дом, парк, связана с родом Немцевичей." },
+        { name: "Костёл Святого Иоанна Крестителя (Волпа)", lat: 53.1333, lng: 24.3333, date: "XVIII в.", category: "3", description: "Деревянный костёл, памятник народного зодчества." },
+        { name: "Церковь Святого Георгия (Индура)", lat: 53.4667, lng: 23.8833, date: "XIX в.", category: "3", description: "Православная церковь." },
+        { name: "Синагога (Зельва)", lat: 53.1494, lng: 24.8089, date: "XIX в.", category: "3", description: "Здание бывшей синагоги." },
+        { name: "Усадьба Горваттов (Мстибово)", lat: 53.0833, lng: 24.5167, date: "XIX в.", category: "3", description: "Парк и усадебные постройки." },
+        { name: "Костёл Святого Михаила (Сопоцкин)", lat: 53.8333, lng: 23.6500, date: "XIX в.", category: "3", description: "Неоготический костёл." },
+        { name: "Церковь Святой Параскевы Пятницы (Скидель)", lat: 53.5833, lng: 24.2500, date: "XIX в.", category: "3", description: "Православная церковь." },
+        { name: "Парк Хрептовичей (Щорсы)", lat: 53.6072, lng: 25.6044, date: "XIX в.", category: "3", description: "Пейзажный парк при усадьбе." },
+        { name: "Городище 'Новогрудок' (Малый замок)", lat: 53.6000, lng: 25.8211, date: "XI–XIII вв.", category: "2", description: "Часть древнего Новогрудка." },
+        { name: "Костёл Святого Казимира (Коложский посад)", lat: 53.6789, lng: 23.8336, date: "XVIII в.", category: "3", description: "Небольшой костёл, историческая застройка." },
+        { name: "Костёл Святой Троицы (Гервяты)", lat: 54.6873301074096, lng: 26.143995272965615, date: "XIX в.", category: "3", description: "Деревянная православная церковь." },
+        { name: "Усадьба Коссаковских (Слоним)", lat: 53.0911, lng: 25.3122, date: "XIX в.", category: "3", description: "Парк и остатки усадьбы." },
+        { name: "Синагога (Мосты)", lat: 53.4044, lng: 24.5375, date: "XIX в.", category: "3", description: "Здание бывшей синагоги." },
+        { name: "Старый костёл (Волковыск)", lat: 53.1567, lng: 24.4689, date: "XVII в.", category: "3", description: "Руины старого костёла." },
+        { name: "Церковь Святого Духа (Сморгонь)", lat: 54.4811, lng: 26.3972, date: "XIX в.", category: "3", description: "Православная церковь." },
+        { name: "Усадьба Рейтанов (Груздово)", lat: 53.2833, lng: 25.1333, date: "XVIII–XIX вв.", category: "3", description: "Усадебный парк, руины." },
+        { name: "Старый костёл (Радунь)", lat: 54.0517, lng: 24.9956, date: "XIX в.", category: "3", description: "Деревянный костёл." },
+        { name: "Церковь Рождества Иоанна Предтечи (Деречин)", lat: 53.1175, lng: 24.7456, date: "XIX в.", category: "3", description: "Православная церковь." },
+        { name: "Городище 'Свислочь' (Старый город)", lat: 53.0317, lng: 24.0944, date: "XI–XIII вв.", category: "2", description: "Древнее поселение." },
+        { name: "Усадьба Пусловских (Пески)", lat: 53.4322, lng: 24.6333, date: "XIX в.", category: "3", description: "Парк и флигели." },
+        { name: "Костёл Святой Анны (Лынтупы)", lat: 55.0500, lng: 26.3167, date: "XIX в.", category: "3", description: "Неоготика." },
+        { name: "Кладбищенская церковь (Ошмяны)", lat: 54.4239, lng: 25.9378, date: "XIX в.", category: "3", description: "Православная церковь на кладбище." },
+        { name: "Усадьба Войниловичей (Савичи)", lat: 53.2167, lng: 25.5167, date: "XIX в.", category: "3", description: "Парк и руины усадьбы." },
+        { name: "Малая синагога (Слоним)", lat: 53.0939, lng: 25.3156, date: "XIX в.", category: "3", description: "Здание бывшей синагоги." },
+        { name: "Костёл Святого Иосифа (предместье)", lat: 53.6736, lng: 23.8356, date: "XVIII в.", category: "3", description: "Небольшой костёл, историческая застройка." },
+        { name: "Церковь Святой Варвары (Волковыск)", lat: 53.1589, lng: 24.4678, date: "XIX в.", category: "3", description: "Православная церковь." },
+        { name: "Городище 'Щучин' (Старый город)", lat: 53.6000, lng: 24.7444, date: "XI–XIII вв.", category: "2", description: "Часть древнего Щучина." },
+        { name: "Усадьба Толстых (Березовка)", lat: 53.5333, lng: 25.5000, date: "XIX в.", category: "3", description: "Парк и остатки усадьбы." },
+        { name: "Костёл Святого Станислава (Красносельский)", lat: 53.2667, lng: 24.5333, date: "XIX в.", category: "3", description: "Неоготика." },
+    ];
+
+    console.log(`✅ Загружено объектов: ${grodnoSights.length}`);
+
+    // ------------------- 4. ФУНКЦИИ ДЛЯ МАРКЕРОВ -------------------
+    function getMarkerColor(category) {
+        const colors = { '0': '#b91c1c', '1': '#f97316', '2': '#1e88e5', '3': '#2b7a3e' };
+        return colors[category] || '#6c757d';
+    }
+
+    function createCategoryIcon(category, color) {
+        return L.divIcon({
+            html: `<div style="background-color: ${color}; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-size: 14px; font-weight: bold; color: white;">${category}</div>`,
+            className: 'custom-icon',
+            iconSize: [32, 32],
+            popupAnchor: [0, -14]
+        });
+    }
+
+    let currentMarkers = [];
+
+    function clearMarkers() {
+        currentMarkers.forEach(marker => map.removeLayer(marker));
+        currentMarkers = [];
+    }
+
+    function renderMarkers(filterCategory = 'all') {
+        clearMarkers();
+        const filtered = filterCategory === 'all' ? grodnoSights : grodnoSights.filter(s => s.category === filterCategory);
+        filtered.forEach(sight => {
+            const color = getMarkerColor(sight.category);
+            const icon = createCategoryIcon(sight.category, color);
+            const popupHtml = `
+                <div style="min-width: 220px; max-width: 280px; font-family: 'Segoe UI', sans-serif;">
+                    <h3 style="margin:0 0 6px 0; color:#1a4d2a; border-bottom:1px solid #ccc;">${sight.name}</h3>
+                    <p style="margin:6px 0;"><strong>📅 Время:</strong> ${sight.date}</p>
+                    <p style="margin:6px 0;"><strong>🏷 Категория:</strong> ${sight.category}</p>
+                    <p style="margin:8px 0 4px 0; font-size:0.9rem;">${sight.description || '—'}</p>
+                    <hr><small>📍 ${sight.lat.toFixed(4)}°, ${sight.lng.toFixed(4)}°</small>
+                </div>
+            `;
+            const marker = L.marker([sight.lat, sight.lng], { icon: icon }).addTo(map);
+            marker.bindPopup(popupHtml);
+            marker.bindTooltip(sight.name, { permanent: false, direction: 'top', offset: [0, -16], opacity: 0.8 });
+            currentMarkers.push(marker);
+        });
+        document.getElementById('stats').innerText = `Показано: ${filtered.length} из ${grodnoSights.length}`;
+        if (filterCategory !== 'all') {
+            map.openPopup(`<b>Фильтр: категория ${filterCategory}</b><br>Показано ${filtered.length} объектов`, map.getCenter(), { closeButton: true, autoClose: true });
+        }
+    }
+
+    // ------------------- 5. ФИЛЬТР -------------------
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    filterButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderMarkers(btn.getAttribute('data-cat'));
+        });
+    });
+
+    // ------------------- 6. СТАРТОВАЯ ОТРИСОВКА -------------------
+    renderMarkers('all');
+
+    setTimeout(() => {
+        map.openPopup(`<b>✅ Карта загружена!</b><br>${grodnoSights.length} историко-культурных ценностей<br>Используйте фильтр.`, map.getCenter(), { className: 'info-popup', closeButton: true });
+    }, 800);
+</script>
+</body>
+</html>
